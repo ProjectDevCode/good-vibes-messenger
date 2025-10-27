@@ -1,0 +1,5 @@
+{
+  "name": "Good Vibes Messenger",
+  "description": "An application to generate and send 'Good morning' and 'Good night' messages with custom images via WhatsApp, designed for simplicity and ease of use.",
+  "requestFramePermissions": []
+}

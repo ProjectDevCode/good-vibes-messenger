@@ -1,9 +1,11 @@
 // Este arquivo deve estar em: api/gemini-proxy.ts
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(request: VercelRequest, response: VercelResponse) {
+// A importação de '@vercel/node' foi removida.
+// Os tipos de 'request' e 'response' são inferidos ou tratados como 'any',
+// o que é seguro neste contexto, pois a Vercel garante a estrutura desses objetos.
+export default async function handler(request: any, response: any) {
   // Verifica se a chave de API está configurada nas variáveis de ambiente da Vercel
   if (!process.env.GEMINI_API_KEY) {
     return response.status(500).json({ error: "A chave de API do Gemini não foi configurada no servidor. Verifique as variáveis de ambiente do projeto na Vercel." });

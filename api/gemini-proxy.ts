@@ -6,6 +6,14 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 // Os tipos de 'request' e 'response' são inferidos ou tratados como 'any',
 // o que é seguro neste contexto, pois a Vercel garante a estrutura desses objetos.
 export default async function handler(request: any, response: any) {
+  // LOG DE DIAGNÓSTICO: Verificando a variável de ambiente
+  console.log("Iniciando a função do servidor...");
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {
+    console.log("Variável de ambiente GEMINI_API_KEY encontrada com sucesso.");
+  } else {
+    console.error("ERRO CRÍTICO: Variável de ambiente GEMINI_API_KEY não encontrada ou está vazia!");
+  }
+
   // Verifica se a chave de API está configurada nas variáveis de ambiente da Vercel
   if (!process.env.GEMINI_API_KEY) {
     return response.status(500).json({ error: "A chave de API do Gemini não foi configurada no servidor. Verifique as variáveis de ambiente do projeto na Vercel." });

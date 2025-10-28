@@ -184,7 +184,7 @@ function App() {
         <LoadingSpinner message={isLoadingSuggestions ? 'Buscando inspiração...' : 'Criando sua arte...'} />
       )}
       <header className="bg-brand-secondary text-white p-4 shadow-md sticky top-0 z-10">
-        <h1 className="text-2xl font-bold text-center">Mensageiro do Bem</h1>
+        <h1 className="text-2xl font-bold text-center">Greetings Messenger</h1>
       </header>
 
       <main className="container mx-auto p-4 md:p-6 space-y-8 max-w-3xl">

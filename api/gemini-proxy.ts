@@ -49,45 +49,71 @@ export default async function handler(request: any, response: any) {
       return response.status(200).json(suggestions);
     }
 
-    // Rota para gerar imagens (AGORA USA DeepAI - com método de envio robusto)
+    // Rota para gerar imagens (AGORA USA Stable Horde - a solução gratuita e comunitária)
     if (action === "generateImage") {
-      if (!process.env.DEEPAI_API_KEY) {
-        return response.status(500).json({ error: "A chave de API do DeepAI não foi configurada no servidor. Verifique as variáveis de ambiente." });
-      }
+      const hordeApiKey = process.env.STABLE_HORDE_API_KEY || '0000000000';
+      console.log("Usando a chave da API do Stable Horde.");
 
       const { message, imageStyle, messageType } = payload;
       const prompt = `Estilo: ${imageStyle}. Uma imagem vibrante, positiva, e inspiradora sobre "${message}". O ÚNICO texto escrito na imagem deve ser "${messageType}". O texto deve ser claro, legível e bem integrado ao design.`;
       
-      const body = new URLSearchParams();
-      body.append('text', prompt);
-
-      const deepaiResponse = await fetch('https://api.deepai.org/api/text2img', {
+      // 1. Iniciar a geração da imagem
+      const initialResponse = await fetch('https://stablehorde.net/api/v2/generate/async', {
         method: 'POST',
         headers: {
-          'api-key': process.env.DEEPAI_API_KEY,
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/json',
+          'apikey': hordeApiKey,
         },
-        body: body.toString(),
+        body: JSON.stringify({
+          prompt: prompt,
+          params: {
+            sampler_name: 'k_dpmpp_2s_a',
+            width: 512,
+            height: 512,
+            steps: 25,
+          },
+        }),
       });
 
-      const deepaiData = await deepaiResponse.json();
-
-      if (!deepaiResponse.ok || !deepaiData.output_url) {
-        console.error("Erro da API DeepAI:", deepaiData);
-        const errorMessage = deepaiData.err || JSON.stringify(deepaiData);
-        throw new Error(`Falha ao gerar imagem com DeepAI: ${errorMessage}`);
+      const initialData = await initialResponse.json();
+      if (!initialResponse.ok || !initialData.id) {
+        console.error("Erro ao iniciar a geração no Stable Horde:", initialData);
+        throw new Error(`Falha ao iniciar a geração no Stable Horde: ${initialData.message || 'Erro desconhecido'}`);
       }
       
-      // A API retorna a URL da imagem. Precisamos buscar essa imagem.
-      const imageUrlFromApi = deepaiData.output_url;
+      const generationId = initialData.id;
+      
+      // 2. Verificar o status da geração até que esteja pronta
+      let finalData;
+      let retries = 0;
+      const maxRetries = 20; // Espera no máximo 20 * 5s = 100 segundos
+
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Espera 5 segundos
+
+        const checkResponse = await fetch(`https://stablehorde.net/api/v2/generate/check/${generationId}`);
+        const checkData = await checkResponse.json();
+
+        if (checkData.done) {
+          finalData = checkData;
+          break;
+        }
+        retries++;
+      }
+      
+      if (!finalData || finalData.generations.length === 0) {
+        throw new Error('A geração da imagem demorou muito ou falhou no Stable Horde.');
+      }
+      
+      const imageUrlFromApi = finalData.generations[0].img;
       const imageResponse = await fetch(imageUrlFromApi);
       if (!imageResponse.ok) {
-          throw new Error('Não foi possível baixar a imagem gerada pela DeepAI.');
+          throw new Error('Não foi possível baixar a imagem gerada pelo Stable Horde.');
       }
 
       const imageBuffer = await imageResponse.arrayBuffer();
       const base64Image = Buffer.from(imageBuffer).toString('base64');
-      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      const mimeType = imageResponse.headers.get('content-type') || 'image/webp';
       const imageUrl = `data:${mimeType};base64,${base64Image}`;
 
       return response.status(200).json({ imageUrl });

@@ -1,9 +1,9 @@
+import type { Handler } from "@netlify/functions";
 import { GoogleGenAI, Type } from "@google/genai";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { MessageType, MessageTheme, ImageStyle } from "../types";
+import { MessageType, MessageTheme, ImageStyle } from "../../../types";
 
 // Initialize the Google Gemini API client
-// The API key must be set in the environment variables of your Vercel project
+// The API key must be set in the environment variables of your Netlify project
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
@@ -16,12 +16,12 @@ async function handleGetSuggestions(payload: {
   theme: MessageTheme;
 }) {
   const { messageType, theme } = payload;
-  // fix: Use gemini-2.5-flash for basic text tasks.
+  // Use gemini-2.5-flash for basic text tasks.
   const model = "gemini-2.5-flash"; 
 
   const prompt = `Gere 3 sugestões de mensagens curtas e inspiradoras de "${messageType}" com o tema "${theme}". As mensagens devem ser adequadas para enviar no WhatsApp. Formato da resposta deve ser um array JSON de strings. Por exemplo: ["mensagem 1", "mensagem 2", "mensagem 3"]`;
 
-  // fix: Use ai.models.generateContent to generate text, and configure for JSON output.
+  // Use ai.models.generateContent to generate text, and configure for JSON output.
   const response = await ai.models.generateContent({
     model,
     contents: [{ parts: [{ text: prompt }] }],
@@ -37,7 +37,7 @@ async function handleGetSuggestions(payload: {
     },
   });
 
-  // fix: Extract text from response using the .text property.
+  // Extract text from response using the .text property.
   const text = response.text.trim();
   try {
     const suggestions = JSON.parse(text);
@@ -64,12 +64,12 @@ async function handleGenerateImage(payload: {
   messageType: MessageType;
 }) {
   const { message, imageStyle, messageType } = payload;
-  // fix: Use imagen-4.0-generate-001 for high-quality image generation.
+  // Use imagen-4.0-generate-001 for high-quality image generation.
   const model = "imagen-4.0-generate-001";
 
   const prompt = `Crie uma imagem no estilo "${imageStyle}" que represente visualmente a seguinte mensagem de "${messageType}": "${message}". A imagem deve ser bonita, inspiradora e adequada para compartilhar em redes sociais como o WhatsApp. Não inclua nenhum texto na imagem.`;
 
-  // fix: Use ai.models.generateImages for image generation.
+  // Use ai.models.generateImages for image generation.
   const imageResponse = await ai.models.generateImages({
     model,
     prompt,
@@ -90,43 +90,60 @@ async function handleGenerateImage(payload: {
 }
 
 /**
- * Vercel Serverless Function handler.
+ * Netlify Serverless Function handler.
  * Acts as a proxy to the Google Gemini API.
  */
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "Método não permitido" });
+const handler: Handler = async (event) => {
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      headers: { Allow: "POST" },
+      body: JSON.stringify({ error: "Método não permitido" }),
+    };
   }
 
   try {
-    const { action, payload } = req.body;
+    const { action, payload } = JSON.parse(event.body || "{}");
 
     if (!action || !payload) {
-      return res
-        .status(400)
-        .json({ error: "Ação ou payload ausente na requisição" });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Ação ou payload ausente na requisição" }),
+      };
     }
 
     switch (action) {
       case "getSuggestions":
         const suggestions = await handleGetSuggestions(payload);
-        return res.status(200).json(suggestions);
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(suggestions)
+        };
 
       case "generateImage":
         const imageData = await handleGenerateImage(payload);
-        return res.status(200).json(imageData);
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(imageData)
+        };
 
       default:
-        return res.status(400).json({ error: "Ação desconhecida" });
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: "Ação desconhecida" }),
+        };
     }
   } catch (error) {
     console.error("Erro no proxy da API Gemini:", error);
     const errorMessage =
       error instanceof Error ? error.message : "Erro interno no servidor";
-    return res.status(500).json({ error: errorMessage });
+    return {
+        statusCode: 500,
+        body: JSON.stringify({ error: errorMessage })
+    };
   }
-}
+};
+
+export { handler };

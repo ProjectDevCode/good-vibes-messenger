@@ -1,35 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mensageiro do Bem</title>
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'brand-primary': '#25D366',
-            'brand-secondary': '#128C7E',
-            'brand-light': '#DCF8C6',
-            'brand-dark': '#075E54',
-          },
-        }
-      }
-    }
-  </script>
-
-  <style>
-    @keyframes fade-in {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in {
-      animation: fade-in 0.5s ease-out forwards;
-    }
-  </style>
 <script type="importmap">
 {
   "imports": {
@@ -39,13 +7,9 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0",
     "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.0",
     "vite": "https://aistudiocdn.com/vite@^7.1.12",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0"
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0",
+    "@netlify/functions": "https://aistudiocdn.com/@netlify/functions@^5.0.1"
   }
 }
 </script>
-</head>
-<body class="bg-gray-100 dark:bg-gray-900">
-  <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-</html>
+full contents of index.html

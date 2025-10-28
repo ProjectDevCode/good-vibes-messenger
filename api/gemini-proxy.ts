@@ -1,13 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { Handler, HandlerEvent } from "@netlify/functions";
-import { MessageType, MessageTheme, ImageStyle } from "../../types";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { MessageType, MessageTheme, ImageStyle } from "../types";
 
 async function getSuggestionsHandler(payload: { messageType: MessageType; theme: MessageTheme; }) {
-    // FIX: Use API_KEY from environment variables as per guidelines.
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        // FIX: Update error message to reflect the correct environment variable name.
-        throw new Error("A chave de API do Gemini (API_KEY) não foi configurada no servidor.");
+        throw new Error("A chave de API do Gemini (GEMINI_API_KEY) não foi configurada no servidor.");
     }
     const ai = new GoogleGenAI({ apiKey });
 
@@ -38,15 +36,13 @@ async function getSuggestionsHandler(payload: { messageType: MessageType; theme:
 
 async function generateImageHandler(payload: { message: string; imageStyle: ImageStyle; messageType: MessageType; }) {
     const clipDropApiKey = process.env.CLIPDROP_API_KEY;
-    // FIX: Use API_KEY from environment variables as per guidelines.
-    const geminiApiKey = process.env.API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
 
     if (!clipDropApiKey) {
         throw new Error("A chave de API do ClipDrop (CLIPDROP_API_KEY) não foi configurada no servidor.");
     }
     if (!geminiApiKey) {
-        // FIX: Update error message to reflect the correct environment variable name.
-         throw new Error("A chave de API do Gemini (API_KEY) não foi configurada no servidor para otimizar o prompt.");
+         throw new Error("A chave de API do Gemini (GEMINI_API_KEY) não foi configurada no servidor para otimizar o prompt.");
     }
 
     const { message, imageStyle, messageType } = payload;
@@ -57,7 +53,6 @@ async function generateImageHandler(payload: { message: string; imageStyle: Imag
     
     const enhancementResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        // FIX: Use consistent and explicit contents format.
         contents: [{ parts: [{ text: enhancementPrompt }] }],
     });
     const enhancedPrompt = enhancementResponse.text.trim();
@@ -85,63 +80,31 @@ async function generateImageHandler(payload: { message: string; imageStyle: Imag
     return { imageUrl };
 }
 
-export const handler: Handler = async (event: HandlerEvent) => {
-    if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            headers: { 'Allow': 'POST', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: 'Método não permitido' }),
-        };
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return res.status(405).json({ error: 'Método não permitido' });
     }
 
     try {
-        if (!event.body) {
-             return {
-                statusCode: 400,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Ação ou payload ausente na requisição' }),
-             };
-        }
-        
-        const { action, payload } = JSON.parse(event.body);
-
+        const { action, payload } = req.body;
         if (!action || !payload) {
-            return {
-                statusCode: 400,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'Ação ou payload ausente na requisição' }),
-            };
+            return res.status(400).json({ error: 'Ação ou payload ausente na requisição' });
         }
 
         switch (action) {
             case 'getSuggestions':
                 const suggestions = await getSuggestionsHandler(payload);
-                return {
-                    statusCode: 200,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(suggestions),
-                };
+                return res.status(200).json(suggestions);
             case 'generateImage':
                 const imageData = await generateImageHandler(payload);
-                return {
-                    statusCode: 200,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(imageData),
-                };
+                return res.status(200).json(imageData);
             default:
-                return {
-                    statusCode: 400,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ error: 'Ação desconhecida' }),
-                };
+                return res.status(400).json({ error: 'Ação desconhecida' });
         }
     } catch (error) {
         console.error("Erro no proxy da API:", error);
         const errorMessage = error instanceof Error ? error.message : 'Erro interno no servidor';
-        return {
-            statusCode: 500,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: errorMessage }),
-        };
+        return res.status(500).json({ error: errorMessage });
     }
-};
+}

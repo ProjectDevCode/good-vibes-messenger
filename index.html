@@ -1,4 +1,25 @@
-<script type="importmap">
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mensageiro do Bem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-primary': '#22c55e', // Verde
+              'brand-secondary': '#16a34a', // Verde escuro
+            }
+          }
+        },
+        darkMode: 'class',
+      }
+    </script>
+  <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
@@ -7,9 +28,13 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0",
     "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.0",
     "vite": "https://aistudiocdn.com/vite@^7.1.12",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0",
-    "@netlify/functions": "https://aistudiocdn.com/@netlify/functions@^5.0.1"
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0"
   }
 }
 </script>
-full contents of index.html
+</head>
+  <body class="bg-gray-100 dark:bg-gray-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

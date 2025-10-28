@@ -2,18 +2,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import fetch from 'node-fetch';
-import FormData from 'form-data';
-
-// Função para converter um stream em um buffer, necessário para processar a imagem
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        stream.on('data', (chunk) => chunks.push(chunk));
-        stream.on('error', reject);
-        stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-}
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (request.method !== "POST") {
@@ -72,7 +60,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
           method: 'POST',
           headers: {
             'x-api-key': clipdropApiKey,
-            ...form.getHeaders()
           },
           body: form,
         }
@@ -83,8 +70,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
         console.error("Erro do ClipDrop:", errorText);
         throw new Error(`Falha ao gerar imagem com ClipDrop: ${errorText}`);
       }
-
-      const imageBuffer = await streamToBuffer(clipdropResponse.body);
+      
+      const imageArrayBuffer = await clipdropResponse.arrayBuffer();
+      const imageBuffer = Buffer.from(imageArrayBuffer);
       const imageUrl = `data:image/png;base64,${imageBuffer.toString('base64')}`;
       
       return response.status(200).json({ imageUrl });

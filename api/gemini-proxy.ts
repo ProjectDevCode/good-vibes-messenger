@@ -84,13 +84,13 @@ const generateImage = async (payload: { message: string; imageStyle: ImageStyle;
     const { message, imageStyle, messageType, theme } = payload;
     
     const themeInstructions = theme === MessageTheme.CHRISTIAN
-        ? "Incorpore elementos sutis e reverentes como luz divina, raios de sol, uma pomba branca ou pássaros colorido ou borboletas."
+        ? "Incorpore elementos sutis e reverentes como luz divina, raios de sol, uma pomba branca ou pássaro colorido ou borboletas."
         : "Use elementos da natureza como um lindo nascer do sol, flores desabrochando ou paisagens tranquilas.";
 
     // Prompt Engineering Aprimorado
     const finalPrompt = `Obra-prima, foto cinematográfica, alta qualidade. Foco principal: O texto "${messageType}" deve aparecer de forma clara, bonita e artisticamente integrada na imagem. A cena deve refletir o sentimento da mensagem: "${message}". Estilo visual: ${imageStyle}. ${themeInstructions}.`;
 
-    const negativePrompt = "texto feio, texto distorcido, texto ilegível, marca d'água, assinatura, baixa qualidade, deformado, feio, foto borrada";
+    const negativePrompt = "texto feio, texto distorcido, texto ilegível, marca d'água, assinatura, baixa qualidade, deformado, feio, foto borrada, pessoas na foto";
 
     const response = await fetchWithTimeout(
         "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-3-medium-diffusers",

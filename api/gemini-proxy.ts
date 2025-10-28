@@ -1,10 +1,11 @@
 // Este arquivo deve estar em: api/gemini-proxy.ts
 
 import { GoogleGenAI, Type } from "@google/genai";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Os tipos de 'request' e 'response' são inferidos ou tratados como 'any',
 // o que é seguro neste contexto, pois a Vercel garante a estrutura desses objetos.
-export default async function handler(request: any, response: any) {
+export default async function handler(request: VercelRequest, response: VercelResponse) {
   // LOG DE DIAGNÓSTICO: Verificando a variável de ambiente do Gemini
   console.log("Iniciando a função do servidor...");
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {

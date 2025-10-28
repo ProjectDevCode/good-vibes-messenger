@@ -1,27 +1,18 @@
 // Este arquivo deve estar em: api/gemini-proxy.ts
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
-// A importação de '@vercel/node' foi removida.
 // Os tipos de 'request' e 'response' são inferidos ou tratados como 'any',
 // o que é seguro neste contexto, pois a Vercel garante a estrutura desses objetos.
 export default async function handler(request: any, response: any) {
-  // LOG DE DIAGNÓSTICO: Verificando a variável de ambiente
+  // LOG DE DIAGNÓSTICO: Verificando a variável de ambiente do Gemini
   console.log("Iniciando a função do servidor...");
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {
     console.log("Variável de ambiente GEMINI_API_KEY encontrada com sucesso.");
   } else {
     console.error("ERRO CRÍTICO: Variável de ambiente GEMINI_API_KEY não encontrada ou está vazia!");
   }
-
-  // Verifica se a chave de API está configurada nas variáveis de ambiente da Vercel
-  if (!process.env.GEMINI_API_KEY) {
-    return response.status(500).json({ error: "A chave de API do Gemini não foi configurada no servidor. Verifique as variáveis de ambiente do projeto na Vercel." });
-  }
-
-  // Inicializa a biblioteca da IA com a chave segura
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
+  
   if (request.method !== "POST") {
     return response.status(405).json({ error: "Método não permitido" });
   }
@@ -33,47 +24,71 @@ export default async function handler(request: any, response: any) {
       return response.status(400).json({ error: "Requisição inválida: 'action' e 'payload' são obrigatórios." });
     }
 
-    // Rota para obter sugestões de mensagens
+    // Rota para obter sugestões de mensagens (continua usando Gemini)
     if (action === "getSuggestions") {
-      const { messageType, theme } = payload;
-      const prompt = `Gere 3 sugestões de mensagens de "${messageType}" com um tema "${theme}". As mensagens devem ser curtas, inspiradoras, incluir emojis relevantes e adequadas para compartilhar no WhatsApp. Retorne um array JSON de strings.`;
+        if (!process.env.GEMINI_API_KEY) {
+            return response.status(500).json({ error: "A chave de API do Gemini não foi configurada no servidor. Verifique as variáveis de ambiente do projeto na Vercel." });
+        }
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const { messageType, theme } = payload;
+        const prompt = `Gere 3 sugestões de mensagens de "${messageType}" com um tema "${theme}". As mensagens devem ser curtas, inspiradoras, incluir emojis relevantes e adequadas para compartilhar no WhatsApp. Retorne um array JSON de strings.`;
 
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-          },
-        },
-      });
+        const result = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+            },
+            },
+        });
       
       const suggestions = JSON.parse(result.text.trim());
       return response.status(200).json(suggestions);
     }
 
-    // Rota para gerar imagens
+    // Rota para gerar imagens (AGORA USA DeepAI)
     if (action === "generateImage") {
-      const { message, imageStyle, messageType } = payload;
-      const prompt = `Crie uma imagem no estilo "${imageStyle}", inspirada no sentimento da seguinte mensagem: "${message}". A imagem deve ser vibrante, positiva e adequada para compartilhar em redes sociais. O ÚNICO texto que deve aparecer escrito na imagem é "${messageType}". O texto deve ser claro, legível e esteticamente agradável, integrado ao design da imagem.`;
+      if (!process.env.DEEPAI_API_KEY) {
+        return response.status(500).json({ error: "A chave de API do DeepAI não foi configurada no servidor. Verifique as variáveis de ambiente." });
+      }
 
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: prompt }] },
-        config: { responseModalities: [Modality.IMAGE] },
+      const { message, imageStyle, messageType } = payload;
+      const prompt = `Estilo: ${imageStyle}. Uma imagem vibrante, positiva, e inspiradora sobre "${message}". O ÚNICO texto escrito na imagem deve ser "${messageType}". O texto deve ser claro, legível e bem integrado ao design.`;
+      
+      const formData = new FormData();
+      formData.append('text', prompt);
+
+      const deepaiResponse = await fetch('https://api.deepai.org/api/text2img', {
+        method: 'POST',
+        headers: {
+          'api-key': process.env.DEEPAI_API_KEY,
+        },
+        body: formData,
       });
 
-      if (result.candidates?.[0]?.content?.parts) {
-        for (const part of result.candidates[0].content.parts) {
-          if (part.inlineData) {
-            const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            return response.status(200).json({ imageUrl });
-          }
-        }
+      const deepaiData = await deepaiResponse.json();
+
+      if (!deepaiResponse.ok || !deepaiData.output_url) {
+        console.error("Erro da API DeepAI:", deepaiData);
+        throw new Error(`Falha ao gerar imagem com DeepAI: ${deepaiData.err || 'Resposta inválida'}`);
       }
-      throw new Error('Nenhuma imagem foi retornada pela IA.');
+      
+      // A API retorna a URL da imagem. Precisamos buscar essa imagem.
+      const imageUrlFromApi = deepaiData.output_url;
+      const imageResponse = await fetch(imageUrlFromApi);
+      if (!imageResponse.ok) {
+          throw new Error('Não foi possível baixar a imagem gerada pela DeepAI.');
+      }
+
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const base64Image = Buffer.from(imageBuffer).toString('base64');
+      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      const imageUrl = `data:${mimeType};base64,${base64Image}`;
+
+      return response.status(200).json({ imageUrl });
     }
 
     return response.status(400).json({ error: "Ação desconhecida." });

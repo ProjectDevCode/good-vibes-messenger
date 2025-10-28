@@ -49,7 +49,7 @@ export default async function handler(request: any, response: any) {
       return response.status(200).json(suggestions);
     }
 
-    // Rota para gerar imagens (AGORA USA DeepAI)
+    // Rota para gerar imagens (AGORA USA DeepAI - com método de envio robusto)
     if (action === "generateImage") {
       if (!process.env.DEEPAI_API_KEY) {
         return response.status(500).json({ error: "A chave de API do DeepAI não foi configurada no servidor. Verifique as variáveis de ambiente." });
@@ -58,22 +58,24 @@ export default async function handler(request: any, response: any) {
       const { message, imageStyle, messageType } = payload;
       const prompt = `Estilo: ${imageStyle}. Uma imagem vibrante, positiva, e inspiradora sobre "${message}". O ÚNICO texto escrito na imagem deve ser "${messageType}". O texto deve ser claro, legível e bem integrado ao design.`;
       
-      const formData = new FormData();
-      formData.append('text', prompt);
+      const body = new URLSearchParams();
+      body.append('text', prompt);
 
       const deepaiResponse = await fetch('https://api.deepai.org/api/text2img', {
         method: 'POST',
         headers: {
           'api-key': process.env.DEEPAI_API_KEY,
+          'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: formData,
+        body: body.toString(),
       });
 
       const deepaiData = await deepaiResponse.json();
 
       if (!deepaiResponse.ok || !deepaiData.output_url) {
         console.error("Erro da API DeepAI:", deepaiData);
-        throw new Error(`Falha ao gerar imagem com DeepAI: ${deepaiData.err || 'Resposta inválida'}`);
+        const errorMessage = deepaiData.err || JSON.stringify(deepaiData);
+        throw new Error(`Falha ao gerar imagem com DeepAI: ${errorMessage}`);
       }
       
       // A API retorna a URL da imagem. Precisamos buscar essa imagem.

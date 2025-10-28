@@ -1,15 +1,1 @@
-{
-  "name": "good-vibes-messenger",
-  "version": "1.0.0",
-  "description": "An application to generate and send good vibes messages.",
-  "scripts": {
-    "dev": "echo 'No dev script needed for this setup'"
-  },
-  "dependencies": {
-    "@google/genai": "^1.26.0"
-  },
-  "devDependencies": {
-    "@vercel/node": "^3.2.3",
-    "typescript": "^5.5.4"
-  }
-}
+full contents of package.json

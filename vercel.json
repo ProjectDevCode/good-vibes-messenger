@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.2.3"
-    }
-  }
-}
+full contents of vercel.json

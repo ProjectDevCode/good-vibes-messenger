@@ -49,7 +49,7 @@ export default async function handler(request: any, response: any) {
       return response.status(200).json(suggestions);
     }
 
-    // Rota para gerar imagens (AGORA USA Stable Horde - a solução gratuita e comunitária)
+    // Rota para gerar imagens (USA Stable Horde com parâmetros otimizados)
     if (action === "generateImage") {
       const hordeApiKey = process.env.STABLE_HORDE_API_KEY || '0000000000';
       console.log("Usando a chave da API do Stable Horde.");
@@ -57,27 +57,33 @@ export default async function handler(request: any, response: any) {
       const { message, imageStyle, messageType } = payload;
       const prompt = `Estilo: ${imageStyle}. Uma imagem vibrante, positiva, e inspiradora sobre "${message}". O ÚNICO texto escrito na imagem deve ser "${messageType}". O texto deve ser claro, legível e bem integrado ao design.`;
       
-      // 1. Iniciar a geração da imagem
+      // 1. Iniciar a geração da imagem com parâmetros mais leves
       const initialResponse = await fetch('https://stablehorde.net/api/v2/generate/async', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': hordeApiKey,
+          'Client-Agent': 'GoodVibesMessenger/1.0;contact@example.com' // Agente de cliente educado
         },
         body: JSON.stringify({
           prompt: prompt,
           params: {
-            sampler_name: 'k_dpmpp_2s_a',
+            sampler_name: 'k_euler_a', // Sampler mais rápido e "barato"
             width: 512,
             height: 512,
-            steps: 25,
+            steps: 20, // Reduzimos os passos para diminuir o custo
+            n: 1,
           },
+          models: [
+              'stable_diffusion_3' // Especificando um modelo moderno e de alta qualidade
+          ]
         }),
       });
 
       const initialData = await initialResponse.json();
       if (!initialResponse.ok || !initialData.id) {
         console.error("Erro ao iniciar a geração no Stable Horde:", initialData);
+        // Retorna a mensagem de erro da API diretamente para o usuário
         throw new Error(`Falha ao iniciar a geração no Stable Horde: ${initialData.message || 'Erro desconhecido'}`);
       }
       

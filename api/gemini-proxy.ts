@@ -87,10 +87,10 @@ const generateImage = async (payload: { message: string; imageStyle: ImageStyle;
         ? "Incorpore elementos sutis e reverentes como luz divina, raios de sol, uma pomba branca ou pássaros coloridos ou borboletas."
         : "Use elementos da natureza como um lindo nascer do sol, flores desabrochando ou paisagens tranquilas.";
 
-    // Prompt Engineering Aprimorado
-    const finalPrompt = `Obra-prima, foto cinematográfica, alta qualidade. Foco principal: O texto "${messageType}" deve aparecer de forma clara, bonita e artisticamente integrada na imagem. A cena deve refletir o sentimento da mensagem: "${message}". Estilo visual: ${imageStyle}. ${themeInstructions}. A cena não deve conter pessoas ou figuras humanas.`;
-
-    const negativePrompt = "pessoas, mulher, homem, criança, figura humana, rosto, texto feio, texto distorcido, texto ilegível, marca d'água, assinatura, baixa qualidade, deformado, feio, foto borrada";
+    // Prompt Engineering Aprimorado e mais assertivo
+    const finalPrompt = `Obra-prima, foto cinematográfica, alta qualidade. FOCO ABSOLUTO: renderize o texto "${messageType}" de forma proeminente, clara e bonita. A cena é uma paisagem ou natureza morta, inspirada pelo sentimento da seguinte mensagem (NÃO RENDERIZE ESTE TEXTO NA IMAGEM): "${message}". Estilo visual: ${imageStyle}. ${themeInstructions}.`;
+    
+    const negativePrompt = "pessoas, mulher, homem, criança, figura humana, silhueta, rosto, corpo, multidão, texto feio, texto distorcido, texto ilegível, texto extra, múltiplas linhas de texto, parágrafo, marca d'água, assinatura, baixa qualidade, deformado, feio, foto borrada";
 
     const response = await fetchWithTimeout(
         "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3-medium-diffusers",

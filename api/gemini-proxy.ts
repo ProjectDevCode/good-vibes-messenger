@@ -34,11 +34,20 @@ const getSuggestions = async (payload: { messageType: MessageType; theme: Messag
 };
 
 // Função para gerar a imagem via Hugging Face
-const generateImage = async (payload: { message: string; imageStyle: ImageStyle; messageType: MessageType; }) => {
-  const { message, imageStyle, messageType } = payload;
+const generateImage = async (payload: { message: string; imageStyle: ImageStyle; messageType: MessageType; theme: MessageTheme; }) => {
+  const { message, imageStyle, messageType, theme } = payload;
 
-  // 1. O Gemini otimiza o prompt para o gerador de imagem
-  const imagePromptOptimizationPrompt = `Crie um prompt em inglês para um gerador de imagens de IA, baseado na mensagem em português: "${message}". O estilo visual deve ser: "${imageStyle}". O prompt deve descrever uma cena bonita e inspiradora. Mais importante: o prompt DEVE instruir a IA a incluir o texto "${messageType}" de forma proeminente e artisticamente integrada na imagem. Retorne apenas o prompt em inglês.`;
+  // 1. O Gemini otimiza o prompt para o gerador de imagem, agora com consciência do tema
+  const imagePromptOptimizationPrompt = `Crie um prompt em inglês, altamente detalhado, para um gerador de imagens de IA (como o Stable Diffusion).
+
+O objetivo é criar uma imagem com o seguinte tema: "${theme}".
+O estilo visual deve ser: "${imageStyle}".
+A mensagem original em português é: "${message}".
+
+REGRAS CRÍTICAS PARA O PROMPT GERADO:
+1.  **TEXTO OBRIGATÓRIO:** O prompt DEVE, inegociavelmente, instruir a IA a renderizar o texto "${messageType}" de forma clara, bonita e como o foco principal da imagem. O texto não é opcional, é o sujeito da cena.
+2.  **INFLUÊNCIA DO TEMA:** O prompt DEVE usar o tema "${theme}" para definir os elementos visuais da cena. Por exemplo, para um tema 'Cristão', sugira elementos como luz divina, pombas, vitrais, ou paisagens serenas. Para 'Genérico', foque em elementos universalmente positivos como um nascer do sol, flores, ou uma xícara de café.
+3.  **RETORNO:** Retorne APENAS o prompt final em inglês, pronto para ser usado.`;
 
   const optimizationResponse = await ai.models.generateContent({
       model: textModel,

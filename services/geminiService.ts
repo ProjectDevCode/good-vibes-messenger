@@ -36,9 +36,10 @@ export const getGreetingSuggestions = async (
 export const generateImageFromMessage = async (
   message: string,
   imageStyle: ImageStyle,
-  messageType: MessageType
+  messageType: MessageType,
+  theme: MessageTheme
 ): Promise<string> => {
-   const { imageUrl } = await callProxy('generateImage', { message, imageStyle, messageType });
+   const { imageUrl } = await callProxy('generateImage', { message, imageStyle, messageType, theme });
    if (typeof imageUrl !== 'string') {
        throw new Error('A resposta do servidor para a imagem não continha uma URL válida.');
    }

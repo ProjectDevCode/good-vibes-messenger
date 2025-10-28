@@ -68,7 +68,7 @@ function App() {
     setIsLoadingImage(true);
     setError(null);
     try {
-      const image = await generateImageFromMessage(message, imageStyle, messageType);
+      const image = await generateImageFromMessage(message, imageStyle, messageType, theme);
       setGeneratedImage(image);
     } catch (e) {
       if (e instanceof Error) {

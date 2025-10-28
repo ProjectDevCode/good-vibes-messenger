@@ -93,7 +93,7 @@ const generateImage = async (payload: { message: string; imageStyle: ImageStyle;
     const negativePrompt = "pessoas, mulher, homem, criança, figura humana, rosto, texto feio, texto distorcido, texto ilegível, marca d'água, assinatura, baixa qualidade, deformado, feio, foto borrada";
 
     const response = await fetchWithTimeout(
-        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-3-medium-diffusers",
+        "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3-medium-diffusers",
         {
             headers: {
                 "Content-Type": "application/json",

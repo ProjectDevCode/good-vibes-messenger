@@ -84,7 +84,7 @@ const generateImage = async (payload: { message: string; imageStyle: ImageStyle;
     const { message, imageStyle, messageType, theme } = payload;
     
     const themeInstructions = theme === MessageTheme.CHRISTIAN
-        ? "Incorpore elementos sutis e reverentes como luz divina, raios de sol, uma pomba branca ou uma cruz distante."
+        ? "Incorpore elementos sutis e reverentes como luz divina, raios de sol, uma pomba branca ou pássaros colorido ou borboletas."
         : "Use elementos da natureza como um lindo nascer do sol, flores desabrochando ou paisagens tranquilas.";
 
     // Prompt Engineering Aprimorado

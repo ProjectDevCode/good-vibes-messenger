@@ -49,69 +49,44 @@ export default async function handler(request: any, response: any) {
       return response.status(200).json(suggestions);
     }
 
-    // Rota para gerar imagens (USA Stable Horde com parâmetros otimizados)
+    // Rota para gerar imagens (USA Stable Horde com o endpoint SÍNCRONO)
     if (action === "generateImage") {
       const hordeApiKey = process.env.STABLE_HORDE_API_KEY || '0000000000';
-      console.log("Usando a chave da API do Stable Horde.");
+      console.log("Usando a API do Stable Horde no modo síncrono.");
 
       const { message, imageStyle, messageType } = payload;
       const prompt = `Estilo: ${imageStyle}. Uma imagem vibrante, positiva, e inspiradora sobre "${message}". O ÚNICO texto escrito na imagem deve ser "${messageType}". O texto deve ser claro, legível e bem integrado ao design.`;
       
-      // 1. Iniciar a geração da imagem com parâmetros mais leves
-      const initialResponse = await fetch('https://stablehorde.net/api/v2/generate/async', {
+      const hordeResponse = await fetch('https://stablehorde.net/api/v2/generate/sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': hordeApiKey,
-          'Client-Agent': 'GoodVibesMessenger/1.0;contact@example.com' // Agente de cliente educado
+          'Client-Agent': 'GoodVibesMessenger/1.0.1;contact@example.com'
         },
         body: JSON.stringify({
           prompt: prompt,
           params: {
-            sampler_name: 'k_euler_a', // Sampler mais rápido e "barato"
+            sampler_name: 'k_euler_a',
             width: 512,
             height: 512,
-            steps: 20, // Reduzimos os passos para diminuir o custo
+            steps: 25, // 25 passos é um bom equilíbrio de qualidade e velocidade
             n: 1,
           },
           models: [
-              'stable_diffusion_3' // Especificando um modelo moderno e de alta qualidade
+              'AlbedoBase XL' // Um modelo SDXL popular e rápido
           ]
         }),
       });
 
-      const initialData = await initialResponse.json();
-      if (!initialResponse.ok || !initialData.id) {
-        console.error("Erro ao iniciar a geração no Stable Horde:", initialData);
-        // Retorna a mensagem de erro da API diretamente para o usuário
-        throw new Error(`Falha ao iniciar a geração no Stable Horde: ${initialData.message || 'Erro desconhecido'}`);
+      const hordeData = await hordeResponse.json();
+      
+      if (!hordeResponse.ok || !hordeData.generations || hordeData.generations.length === 0) {
+        console.error("Erro na geração síncrona do Stable Horde:", hordeData);
+        throw new Error(`Falha ao gerar imagem no Stable Horde: ${hordeData.message || 'Resposta inválida da API.'}`);
       }
       
-      const generationId = initialData.id;
-      
-      // 2. Verificar o status da geração até que esteja pronta
-      let finalData;
-      let retries = 0;
-      const maxRetries = 20; // Espera no máximo 20 * 5s = 100 segundos
-
-      while (retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Espera 5 segundos
-
-        const checkResponse = await fetch(`https://stablehorde.net/api/v2/generate/check/${generationId}`);
-        const checkData = await checkResponse.json();
-
-        if (checkData.done) {
-          finalData = checkData;
-          break;
-        }
-        retries++;
-      }
-      
-      if (!finalData || finalData.generations.length === 0) {
-        throw new Error('A geração da imagem demorou muito ou falhou no Stable Horde.');
-      }
-      
-      const imageUrlFromApi = finalData.generations[0].img;
+      const imageUrlFromApi = hordeData.generations[0].img;
       const imageResponse = await fetch(imageUrlFromApi);
       if (!imageResponse.ok) {
           throw new Error('Não foi possível baixar a imagem gerada pelo Stable Horde.');

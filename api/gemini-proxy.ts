@@ -15,9 +15,10 @@ async function handleGetSuggestions(payload: any, res: VercelResponse) {
     O usuário quer 3 mensagens curtas e amigáveis.
     O tipo de mensagem é "${messageType}".
     O tema é "${theme}".
+    Inclua emojis relevantes no final de cada mensagem para torná-las mais vibrantes e amigáveis.
     Se o tema for "Cristão", inclua referências ou sentimentos cristãos sutis.
     Responda APENAS com um array JSON de strings, sem nenhum texto adicional ou formatação.
-    Exemplo de resposta: ["mensagem 1", "mensagem 2", "mensagem 3"]`;
+    Exemplo de resposta: ["mensagem 1 ☀️", "mensagem 2 🙏", "mensagem 3 😊"]`;
     
     try {
         const response = await geminiAI.models.generateContent({
@@ -58,10 +59,11 @@ async function handleGenerateImage(payload: any, res: VercelResponse) {
     Your task is to convert a user's simple request into a rich, descriptive, and artistic prompt in English.
     The prompt should be a single, comma-separated string of descriptive keywords and phrases.
     Focus on visual details: lighting, composition, mood, and artistic style.
+    Crucially, the image MUST feature the text "${messageType}" prominently and beautifully integrated into the scene. The text should be legible and artistic.
     The final prompt must be in English.
     Example:
     User request: Bom dia, Realista, "O sol nasce, um novo dia começa"
-    Your response: "A beautiful, vibrant sunrise over a peaceful landscape, hyper-realistic, cinematic lighting, detailed, 8k, masterpiece"
+    Your response: "A beautiful, vibrant sunrise over a peaceful landscape, with the text 'Bom dia' written in an elegant, glowing font, hyper-realistic, cinematic lighting, detailed, 8k, masterpiece"
     `;
 
     let optimizedPrompt = '';

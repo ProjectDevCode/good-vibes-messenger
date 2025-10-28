@@ -1,149 +1,110 @@
-import type { Handler } from "@netlify/functions";
 import { GoogleGenAI, Type } from "@google/genai";
-import { MessageType, MessageTheme, ImageStyle } from "../../../types";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { MessageType, MessageTheme, ImageStyle } from "../types";
 
-// Initialize the Google Gemini API client
-// The API key must be set in the environment variables of your Netlify project
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+async function getSuggestionsHandler(payload: { messageType: MessageType; theme: MessageTheme; }) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("A chave de API do Gemini (GEMINI_API_KEY) não foi configurada no servidor.");
+    }
+    const ai = new GoogleGenAI({ apiKey });
 
-/**
- * Generates message suggestions using the Gemini API.
- * @param payload - The payload containing message type and theme.
- * @returns A promise that resolves to an array of string suggestions.
- */
-async function handleGetSuggestions(payload: {
-  messageType: MessageType;
-  theme: MessageTheme;
-}) {
-  const { messageType, theme } = payload;
-  // Use gemini-2.5-flash for basic text tasks.
-  const model = "gemini-2.5-flash"; 
+    const { messageType, theme } = payload;
+    const model = "gemini-2.5-flash";
+    const prompt = `Gere 3 sugestões de mensagens curtas e inspiradoras de "${messageType}" com o tema "${theme}". As mensagens devem ser adequadas para enviar no WhatsApp. Formato da resposta deve ser um array JSON de strings. Por exemplo: ["mensagem 1", "mensagem 2", "mensagem 3"]`;
 
-  const prompt = `Gere 3 sugestões de mensagens curtas e inspiradoras de "${messageType}" com o tema "${theme}". As mensagens devem ser adequadas para enviar no WhatsApp. Formato da resposta deve ser um array JSON de strings. Por exemplo: ["mensagem 1", "mensagem 2", "mensagem 3"]`;
-
-  // Use ai.models.generateContent to generate text, and configure for JSON output.
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.STRING,
-          description: "Uma sugestão de mensagem.",
+    const response = await ai.models.generateContent({
+        model,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+            },
         },
-      },
-    },
-  });
+    });
 
-  // Extract text from response using the .text property.
-  const text = response.text.trim();
-  try {
-    const suggestions = JSON.parse(text);
-    if (!Array.isArray(suggestions)) {
-        throw new Error("A resposta da IA não é um array.");
+    const text = response.text.trim();
+    try {
+        return JSON.parse(text);
+    } catch(e) {
+        console.error("Falha ao analisar JSON do Gemini:", text);
+        throw new Error("A resposta da IA para sugestões não estava no formato esperado.");
     }
-    return suggestions;
-  } catch (e) {
-    console.error("Falha ao analisar a resposta de sugestões do Gemini:", text, e);
-    throw new Error(
-      "A resposta da IA para sugestões não estava no formato JSON esperado."
-    );
-  }
 }
 
-/**
- * Generates an image using the Gemini API.
- * @param payload - The payload containing the message, image style, and message type.
- * @returns A promise that resolves to an object with the base64 data URL of the image.
- */
-async function handleGenerateImage(payload: {
-  message: string;
-  imageStyle: ImageStyle;
-  messageType: MessageType;
-}) {
-  const { message, imageStyle, messageType } = payload;
-  // Use imagen-4.0-generate-001 for high-quality image generation.
-  const model = "imagen-4.0-generate-001";
+async function generateImageHandler(payload: { message: string; imageStyle: ImageStyle; messageType: MessageType; }) {
+    const clipDropApiKey = process.env.CLIPDROP_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
 
-  const prompt = `Crie uma imagem no estilo "${imageStyle}" que represente visualmente a seguinte mensagem de "${messageType}": "${message}". A imagem deve ser bonita, inspiradora e adequada para compartilhar em redes sociais como o WhatsApp. Não inclua nenhum texto na imagem.`;
+    if (!clipDropApiKey) {
+        throw new Error("A chave de API do ClipDrop (CLIPDROP_API_KEY) não foi configurada no servidor.");
+    }
+    if (!geminiApiKey) {
+         throw new Error("A chave de API do Gemini (GEMINI_API_KEY) não foi configurada no servidor para otimizar o prompt.");
+    }
 
-  // Use ai.models.generateImages for image generation.
-  const imageResponse = await ai.models.generateImages({
-    model,
-    prompt,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/png',
-      aspectRatio: '1:1', // Square image is good for sharing
-    },
-  });
+    const { message, imageStyle, messageType } = payload;
 
-  if (imageResponse.generatedImages && imageResponse.generatedImages.length > 0) {
-    const base64ImageBytes = imageResponse.generatedImages[0].image.imageBytes;
-    const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
+    // Use Gemini to enhance the prompt for better image results
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+    const enhancementPrompt = `Traduza a seguinte mensagem em português para um prompt de imagem em inglês, conciso e artístico, para uma IA de geração de imagem. O estilo deve ser "${imageStyle}". O tema é "${messageType}". O prompt deve ser apenas descritivo, sem incluir a palavra "message" ou aspas. Mensagem: "${message}"`;
+    
+    const enhancementResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: enhancementPrompt,
+    });
+    const enhancedPrompt = enhancementResponse.text.trim();
+    
+    const formData = new FormData();
+    formData.append('prompt', enhancedPrompt);
+
+    const response = await fetch('https://stable-diffusion-api.com/api/v3/text2img', {
+        method: 'POST',
+        headers: {
+            'x-api-key': clipDropApiKey,
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`ClipDrop API Error: ${response.status}`, errorText);
+        throw new Error(`Falha ao gerar imagem com ClipDrop: ${errorText}`);
+    }
+
+    const imageBuffer = await response.arrayBuffer();
+    const imageUrl = `data:image/png;base64,${Buffer.from(imageBuffer).toString('base64')}`;
+    
     return { imageUrl };
-  } else {
-    throw new Error("Nenhuma imagem foi gerada pela IA.");
-  }
 }
 
-/**
- * Netlify Serverless Function handler.
- * Acts as a proxy to the Google Gemini API.
- */
-const handler: Handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: { Allow: "POST" },
-      body: JSON.stringify({ error: "Método não permitido" }),
-    };
-  }
-
-  try {
-    const { action, payload } = JSON.parse(event.body || "{}");
-
-    if (!action || !payload) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: "Ação ou payload ausente na requisição" }),
-      };
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', 'POST');
+        return res.status(405).json({ error: 'Método não permitido' });
     }
 
-    switch (action) {
-      case "getSuggestions":
-        const suggestions = await handleGetSuggestions(payload);
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(suggestions)
-        };
+    try {
+        const { action, payload } = req.body;
+        if (!action || !payload) {
+            return res.status(400).json({ error: 'Ação ou payload ausente na requisição' });
+        }
 
-      case "generateImage":
-        const imageData = await handleGenerateImage(payload);
-        return {
-            statusCode: 200,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(imageData)
-        };
-
-      default:
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ error: "Ação desconhecida" }),
-        };
+        switch (action) {
+            case 'getSuggestions':
+                const suggestions = await getSuggestionsHandler(payload);
+                return res.status(200).json(suggestions);
+            case 'generateImage':
+                const imageData = await generateImageHandler(payload);
+                return res.status(200).json(imageData);
+            default:
+                return res.status(400).json({ error: 'Ação desconhecida' });
+        }
+    } catch (error) {
+        console.error("Erro no proxy da API:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Erro interno no servidor';
+        return res.status(500).json({ error: errorMessage });
     }
-  } catch (error) {
-    console.error("Erro no proxy da API Gemini:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro interno no servidor";
-    return {
-        statusCode: 500,
-        body: JSON.stringify({ error: errorMessage })
-    };
-  }
-};
-
-export { handler };
+}

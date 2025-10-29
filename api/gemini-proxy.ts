@@ -1,149 +1,151 @@
-// FIX: This file was previously a placeholder. This is the full implementation of the Gemini API proxy.
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleGenAI, Type } from '@google/genai';
-// Assuming types.ts is at the project root, and this file is in api/
-import { ImageStyle, MessageTheme, MessageType } from '../types';
 
-// Gemini API client initialization
-// The API key MUST be obtained exclusively from the environment variable `process.env.API_KEY`.
-if (!process.env.API_KEY) {
-  // On Vercel, this will cause the function to fail, which is intended.
-  // We log to provide more context in serverless function logs.
-  console.error('API_KEY environment variable is not set');
-  throw new Error('API_KEY environment variable is not set');
+// Tipos definidos localmente para tornar a função autossuficiente e evitar erros de importação na Vercel.
+enum MessageType {
+  GOOD_MORNING = 'Bom dia',
+  GOOD_NIGHT = 'Boa noite',
 }
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * Generates greeting suggestions using Gemini.
- */
+enum MessageTheme {
+  GENERIC = 'Genérico',
+  CHRISTIAN = 'Cristão',
+}
+
+enum ImageStyle {
+  REALISTIC = 'Realista',
+  HYPER_REALISTIC = 'Hiper-realista',
+  DRAWING = 'Desenho',
+  ABSTRACT = 'Abstrato',
+  WATERCOLOR = 'Aquarela',
+}
+
+// --- LÓGICA PARA GERAÇÃO DE SUGESTÕES (GEMINI) ---
 const getSuggestions = async (messageType: MessageType, theme: MessageTheme): Promise<string[]> => {
-  const model = 'gemini-2.5-flash';
-  // Prompt in Portuguese to match the app's language
-  const prompt = `Gere 5 sugestões de mensagens de "${messageType}" com um tema "${theme}". As mensagens devem ser curtas, inspiradoras e adequadas para compartilhar em redes sociais. As mensagens devem ser em Português do Brasil.`;
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error('A chave da API do Gemini não está configurada no servidor.');
+  }
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          suggestions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.STRING,
-              description: 'Uma sugestão de mensagem.'
-            },
-            description: 'Uma lista de 5 sugestões de mensagens.'
-          },
-        },
-        required: ['suggestions'],
-      },
-    },
+  const prompt = `Gere 3 sugestões de mensagens de "${messageType}" com um tema "${theme}". As mensagens devem ser curtas, inspiradoras, OBRIGATORIAMENTE incluir emojis relevantes e adequadas para compartilhar no WhatsApp. Retorne um array JSON de strings.`;
+  
+  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: {
+            type: "ARRAY",
+            items: { type: "STRING" }
+        }
+      }
+    }),
   });
 
-  const responseText = response.text;
-  try {
-    const parsed = JSON.parse(responseText);
-    if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
-      return parsed.suggestions;
-    }
-  } catch (e) {
-    console.error('Error parsing Gemini JSON response for suggestions:', e, 'Response text:', responseText);
-    // Fallback if JSON parsing fails but we have text, useful for debugging or resilient UX
-    if (responseText) {
-      // Simple parsing for list-like text
-      return responseText.split('\n').map(s => s.replace(/^[-*]\s*/, '').trim()).filter(Boolean);
-    }
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Erro da API Gemini:', errorData);
+    throw new Error('Falha ao buscar sugestões na API do Gemini.');
   }
+
+  const data = await response.json();
+  const suggestionsText = data.candidates[0]?.content?.parts[0]?.text;
   
-  throw new Error('Não foi possível gerar sugestões a partir da resposta da API.');
+  if (!suggestionsText) {
+    throw new Error('A API do Gemini não retornou sugestões.');
+  }
+
+  return JSON.parse(suggestionsText);
 };
 
-/**
- * Generates an image from a message using Gemini.
- */
+// --- LÓGICA PARA GERAÇÃO DE IMAGEM (HUGGING FACE) ---
 const generateImage = async (
   message: string,
   imageStyle: ImageStyle,
   messageType: MessageType,
   theme: MessageTheme
 ): Promise<{ imageUrl: string }> => {
-  const model = 'imagen-4.0-generate-001';
-  // Detailed prompt for better image results
-  const prompt = `Crie uma imagem de alta qualidade, no estilo ${imageStyle}, que visualmente represente e complemente a seguinte mensagem de "${messageType}" com tema "${theme}": "${message}". A imagem deve ser bonita, inspiradora, com cores vibrantes e sem nenhum texto sobreposto.`;
-
-  const response = await ai.models.generateImages({
-    model,
-    prompt,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/png', // Using PNG for quality
-      aspectRatio: '1:1', // Square image as seen in the UI
-    },
-  });
-
-  const base64ImageBytes = response.generatedImages[0]?.image?.imageBytes;
-  if (!base64ImageBytes) {
-    throw new Error('A API não retornou dados de imagem válidos.');
+  const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
+  if (!HUGGINGFACE_API_KEY) {
+    throw new Error('A chave da API do Hugging Face não está configurada no servidor.');
   }
 
-  const imageUrl = `data:image/png;base64,${base64ImageBytes}`;
+  // Modelo de fallback, ultra-estável e popular
+  const API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0";
+
+  let themeInfluence = '';
+  if (theme === MessageTheme.CHRISTIAN) {
+    themeInfluence = 'Incorpore elementos sutis como luz divina, raios de sol suaves, pombas brancas ou vitrais.';
+  } else {
+    themeInfluence = 'Use elementos como um belo nascer do sol, xícaras de café, flores ou paisagens tranquilas.';
+  }
+
+  const prompt = `Uma obra de arte digital no estilo ${imageStyle}, fotorrealista. A cena é inspirada pela mensagem: "${message}". ${themeInfluence} O foco PRINCIPAL e OBRIGATÓRIO da imagem é o texto "${messageType}" renderizado de forma clara, bonita e artística, perfeitamente integrado à cena. Apenas o texto "${messageType}" deve aparecer.`;
+  const negative_prompt = 'texto feio, texto distorcido, texto ilegível, palavras extras, letras deformadas, pessoas, mulher, homem, figura humana, silhueta, marca d\'água, assinatura, baixa qualidade, desfocado';
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${HUGGINGFACE_API_KEY}`
+    },
+    body: JSON.stringify({ 
+        inputs: prompt,
+        parameters: { negative_prompt }
+    }),
+  });
+
+  if (!response.ok) {
+     const errorText = await response.text();
+     console.error('Erro do Hugging Face:', errorText);
+     throw new Error('Falha ao gerar imagem no Hugging Face.');
+  }
+
+  const imageBlob = await response.blob();
+  const reader = new (require('stream').Readable)();
+  reader._read = () => {};
+  reader.push(Buffer.from(await imageBlob.arrayBuffer()));
+  
+  const chunks: Buffer[] = [];
+  for await (const chunk of reader) {
+    chunks.push(chunk);
+  }
+  
+  const base64Image = Buffer.concat(chunks).toString('base64');
+  const imageUrl = `data:${imageBlob.type};base64,${base64Image}`;
+
   return { imageUrl };
 };
 
-/**
- * Vercel Serverless Function handler
- */
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+// --- HANDLER DA VERCEL FUNCTION ---
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
     const { action, payload } = req.body;
 
-    if (!action || !payload) {
-      return res.status(400).json({ error: 'Ação e payload são obrigatórios.' });
-    }
-
     switch (action) {
       case 'getSuggestions': {
         const { messageType, theme } = payload;
-        if (!messageType || !theme) {
-            return res.status(400).json({ error: 'messageType e theme são obrigatórios para getSuggestions.' });
-        }
         const suggestions = await getSuggestions(messageType, theme);
         return res.status(200).json(suggestions);
       }
       case 'generateImage': {
         const { message, imageStyle, messageType, theme } = payload;
-         if (!message || !imageStyle || !messageType || !theme) {
-            return res.status(400).json({ error: 'message, imageStyle, messageType e theme são obrigatórios para generateImage.' });
-        }
-        const result = await generateImage(
-          message,
-          imageStyle,
-          messageType,
-          theme
-        );
+        const result = await generateImage(message, imageStyle, messageType, theme);
         return res.status(200).json(result);
       }
       default:
         return res.status(400).json({ error: 'Ação inválida.' });
     }
   } catch (error) {
-    console.error('[GEMINI_PROXY_ERROR]', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-    // Send a more user-friendly error message to the client
-    res.status(500).json({ error: `Ocorreu um erro ao comunicar com a IA: ${errorMessage}` });
+    console.error('[PROXY_ERROR]', error);
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no servidor.';
+    res.status(500).json({ error: `Erro interno do servidor: ${errorMessage}` });
   }
 }

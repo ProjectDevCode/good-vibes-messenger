@@ -87,7 +87,7 @@ const generateImageWithHuggingFace = async (
         throw new Error("A chave da API do Hugging Face não está configurada.");
     }
     
-    const API_URL = `https://api-inference.huggingface.co/models/${model}`;
+    const API_URL = `https://router.huggingface.co/hf-inference/models/${model}`;
 
     return fetchWithTimeout(API_URL, {
         method: 'POST',
